@@ -1,0 +1,8 @@
+{
+  "admin": {
+    "password": "scrypt:32768:8:1$hBPbru2mv6aQDy2C$f2e1e30a1f4d1fe49aa24ece297496a52974d6bcc93cac88558fc40851be670dbf7ddb1c2af7ffff93aa20b77b2cf5d1dbd3e4ab64354a7f2c5b1e3074c6dc82",
+    "role": "superadmin",
+    "email": "admin@oroexpress.com",
+    "last_update": "2025-11-10 16:29:29"
+  }
+}
