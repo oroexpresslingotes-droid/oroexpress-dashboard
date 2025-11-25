@@ -1,6 +1,4 @@
-# ======================================================
 # SISTEMA OROEXPRESS UNIFICADO - DASHBOARD INTEGRAL
-# ======================================================
 from dash import Dash, html, dcc, Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
@@ -18,17 +16,13 @@ print("🚀 INICIANDO SISTEMA OROEXPRESS UNIFICADO...")
 # 🥇 Sustituimos InvestPy (que fallaba) por nuestro módulo nuevo
 from data.kitco_gold import get_gold_previous_day as obtener_oro_dia_anterior
 
-# ======================================================
 # CONFIGURACIÓN INICIAL
-# ======================================================
 from pathlib import Path
 
 # 📁 Ruta base dinámica (carpeta donde está app.py)
 BASE_DIR = Path(__file__).resolve().parent
 
-# ======================================================
 # AUTENTICACIÓN DE USUARIOS
-# ======================================================
 from werkzeug.security import check_password_hash
 
 # 📁 Archivo con usuarios y contraseñas (hash)
@@ -60,16 +54,12 @@ CERT_PATH = BASE_DIR / "certificados" / "Pbit.bancodebogota.crt"
 HIST_PATH = BASE_DIR / "data" / "historial_precios.csv"
 LOGO_PATH = BASE_DIR / "assets" / "logo.png"
 
-# ======================================================
 # INICIALIZAR APP (evita error de IDs fuera del layout activo)
-# ======================================================
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY], suppress_callback_exceptions=True)
 app.title = "OroExpress - Lingotes"
 server = app.server
 
-# ======================================================
 # PERSISTENCIA EN DISCO (JSON)
-# ======================================================
 class PersistenceManager:
     def __init__(self):
         self.data_dir = Path("storage")
@@ -77,51 +67,81 @@ class PersistenceManager:
         self.percentages_file = self.data_dir / "calculator_percentages.json"
         print(f"📁 Persistencia en disco: {self.data_dir.absolute()}")
 
-    def save_percentages(self, compra: float, venta: float, venta_directa: float) -> bool:
+    def save_percentages(self, compra, venta, venta_directa,
+                         venta_1gr=0.0, venta_5gr=0.0, venta_10gr=0.0,
+                         venta_20gr=0.0, venta_1oz=0.0, venta_100gr=0.0, venta_200gr=0.0):
+        """Guarda todos los porcentajes, incluidos los nuevos 7 de venta."""
         try:
             data = {
                 'compra': compra,
                 'venta': venta,
                 'venta_directa': venta_directa,
+                'venta_1gr': venta_1gr,
+                'venta_5gr': venta_5gr,
+                'venta_10gr': venta_10gr,
+                'venta_20gr': venta_20gr,
+                'venta_1oz': venta_1oz,
+                'venta_100gr': venta_100gr,
+                'venta_200gr': venta_200gr,
                 'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             with open(self.percentages_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            print(f"💾 Guardado: Compra={compra}%, Venta={venta}%, Venta Directa={venta_directa}%")
+            print("💾 Guardado de porcentajes extendido correctamente.")
             return True
         except Exception as e:
             print(f"❌ Error guardando: {e}")
             return False
-
-    def load_percentages(self) -> dict:
+    
+    def load_percentages(self):
+        """Carga TODOS los porcentajes guardados en el JSON, y agrega los faltantes si no existen."""
         try:
             if self.percentages_file.exists():
                 with open(self.percentages_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                print(f"📂 Cargado desde disco: {data}")
+
+                # Lista completa de campos obligatorios
+                campos = [
+                    'compra', 'venta', 'venta_directa',
+                    'venta_1gr', 'venta_5gr', 'venta_10gr', 'venta_20gr',
+                    'venta_1oz', 'venta_100gr', 'venta_200gr'
+                ]
+
+                # Agregar faltantes
+                for campo in campos:
+                    data.setdefault(campo, 0.0)
+
                 return data
+
+            # Si NO existe archivo, crearlo con valores iniciales
             else:
                 print("📂 Creando archivo con valores por defecto")
-                self.save_percentages(0.0, 0.0, 0.0)
+                self.save_percentages(0, 0, 0)
                 return self.get_default()
-        except Exception as e:
-            print(f"❌ Error cargando: {e}")
-            return self.get_default()
 
-    def get_default(self) -> dict:
+        except Exception as e:
+            print(f"❌ Error cargando porcentajes: {e}")
+            return self.get_default()
+            
+    def get_default(self):
+        """Valores iniciales en caso de no existir el archivo."""
         return {
             'compra': 0.0,
             'venta': 0.0,
             'venta_directa': 0.0,
+            'venta_1gr': 0.0,
+            'venta_5gr': 0.0,
+            'venta_10gr': 0.0,
+            'venta_20gr': 0.0,
+            'venta_1oz': 0.0,
+            'venta_100gr': 0.0,
+            'venta_200gr': 0.0,
             'last_updated': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
 persistence_manager = PersistenceManager()
 percentages_data = persistence_manager.load_percentages()
 
-# ======================================================
-# CSS EMBEBIDO UNIFICADO
-# ======================================================
 app.index_string = '''
 <!DOCTYPE html>
 <html>
@@ -130,128 +150,6 @@ app.index_string = '''
         <title>{%title%}</title>
         {%favicon%}
         {%css%}
-        <style>
-            :root {
-                --primary-gold: #FFD700;
-                --dark-bg: #171c26;
-                --card-bg-yellow: rgba(255, 196, 12, 0.85);
-                --card-bg-white: rgba(248, 249, 250, 0.85);
-                --text-dark: #171c26;
-                --text-light: #ecf0f1;
-                --accent-blue: #2c3e50;
-            }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-
-            body, html {
-                height: 100%;
-                background: linear-gradient(135deg, var(--dark-bg) 0%, #2c3e50 100%) !important;
-                background-attachment: fixed;
-                background-size: cover;
-            }
-            body {
-                background-color: var(--dark-bg) !important;
-                font-family: "Arial", "Helvetica", sans-serif;
-                line-height: 1.6;
-                overflow-x: hidden;
-            }
-
-            .container-wide { max-width: 1280px; margin: 0 auto; padding: 0 1rem; }
-            .header-container {
-                height: 85px;
-                display: flex; align-items: center;
-                margin-bottom: 5px; justify-content: space-between;
-                position: relative;
-            }
-            .logo-img { max-height: 75px; max-width: 330px; object-fit: contain; }
-
-            /* ====== TIRILLA BANCO ====== */
-            .tirilla-container { flex: 1; overflow: hidden; position: relative; background: transparent !important; margin-left: 20px; height: 30px; display: flex; align-items: center; justify-content: flex-end; }
-            .tirilla-wrapper { width: 100%; overflow: hidden; position: relative; height: 30px; display: flex; align-items: center; }
-            .tirilla-marquee {
-                display: inline-block; white-space: nowrap; animation: marquee 20s linear infinite;
-                color: #00FF00; font-size: 14px; font-weight: bold; font-family: "Calibri", "Arial", sans-serif;
-                padding: 6px 0; position: absolute; left: 100%;
-            }
-            .tirilla-marquee:hover { animation-play-state: paused; }
-            @keyframes marquee { 0% { left: 100%; } 100% { left: -100%; } }
-            .tirilla-time { color: #00FF00; font-weight: bold; }
-            .tirilla-venta, .tirilla-compra { color: #FFFFFF; font-weight: bold; }
-
-            .divider {
-                border: none; height: 2px;
-                background: linear-gradient(90deg, transparent, var(--primary-gold), transparent);
-                margin: 8px 0;
-            }
-
-            /* ====== ICON BUTTONS (gear & back) ====== */
-            .icon-btn {
-                position: absolute; top: 55px; right: 10px;
-                width: 38px; height: 38px; border-radius: 50%;
-                border: 2px solid var(--primary-gold);
-                background: rgba(255, 215, 0, 0.12);
-                color: var(--primary-gold); font-weight: 900; font-size: 18px;
-                display: flex; align-items: center; justify-content: center;
-                cursor: pointer;
-                transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
-            }
-            .icon-btn:hover { transform: scale(1.07); box-shadow: 0 6px 16px rgba(255,215,0,.25); background: rgba(255,215,0,0.18); }
-            .icon-btn:focus { outline: none; }
-
-            /* ====== CARDS ====== */
-            .price-block { padding: 15px; border-radius: 10px; min-height: 240px; margin-bottom: 15px; box-shadow: 0 3px 10px rgba(0,0,0,0.15); backdrop-filter: blur(5px); }
-            .price-block-anterior { background: var(--card-bg-yellow); color: var(--text-dark); border: 2px solid #e0b000; }
-            .price-block-vivo { background: var(--card-bg-white); color: var(--text-dark); border: 2px solid #dee2e6; }
-            .price-block-anterior *, .price-block-vivo * { opacity: 1 !important; color: inherit !important; }
-
-            .block-title { text-align: center; margin-bottom: 15px; font-size: 1.2em; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
-            .price-table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
-            .price-table th { padding: 10px 8px; text-align: left; border-bottom: 2px solid var(--text-dark); font-weight: 700; background-color: rgba(23, 28, 38, 0.1); }
-            .price-table td { padding: 8px; text-align: left; border-bottom: 1px solid rgba(23, 28, 38, 0.2); font-weight: 600; }
-            .refresh-indicator { text-align: right; font-size: 0.75em; color: #6c757d; margin-top: 12px; font-style: italic; }
-
-            /* ====== CALCULADORA ====== */
-            .calculator-horizontal { background: rgba(44, 62, 80, 0.85); border: 2px solid var(--primary-gold); border-radius: 10px; padding: 15px; margin-top: 15px; }
-            .section-title { color: var(--text-light); font-size: 1.2em; font-weight: 700; margin-bottom: 15px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
-            .calc-item { text-align: center; padding: 12px; }
-            .calc-header { color: var(--primary-gold); font-weight: 700; margin-bottom: 8px; font-size: 0.95em; text-transform: uppercase; }
-            .calc-label { color: #bdc3c7; font-size: 0.8em; margin: 6px 0 3px 0; font-weight: 500; }
-            .calc-result { font-size: 1.3em; font-weight: bold; color: var(--primary-gold); margin: 8px 0; padding: 10px; border: 2px solid var(--primary-gold); border-radius: 6px; background: rgba(255, 215, 0, 0.1); }
-            .dash-input { width: 100%; padding: 6px 10px; border: 1px solid var(--primary-gold); border-radius: 5px; background: #f8f9fa; color: var(--text-dark); font-weight: 600; text-align: center; font-size: 0.9em; }
-            .dash-button { background: linear-gradient(135deg, var(--primary-gold), #e6c200); color: var(--text-dark); border: none; border-radius: 5px; padding: 8px 12px; font-weight: 700; width: 100%; margin-top: 6px; cursor: pointer; font-size: 0.9em; text-transform: uppercase; }
-
-            /* ====== LINGOTES VIEW ====== */
-            .lingotes-container { min-height: 100vh; background: linear-gradient(135deg, var(--dark-bg) 0%, #2c3e50 100%); padding: 2rem 0; }
-            .lingotes-card { background: rgba(255, 215, 0, 0.1); border: 2px solid var(--primary-gold); border-radius: 15px; padding: 2rem; margin: 1rem 0; backdrop-filter: blur(10px); transition: transform 0.3s ease, box-shadow 0.3s ease; }
-            .lingotes-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(255, 215, 0, 0.2); }
-            .lingotes-title { color: var(--primary-gold); font-size: 2.5rem; font-weight: bold; text-align: center; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 2px; }
-            .card-title { color: var(--primary-gold); font-size: 1.5rem; font-weight: bold; text-align: center; margin-bottom: 1rem; text-transform: uppercase; }
-            .card-value { color: #ffffff; font-size: 2rem; font-weight: bold; text-align: center; margin: 1rem 0; }
-            .card-percentage { display: none !important;}
-
-            /* ✨ RESALTADO SOLO PARA EL CARD "VENTA" (antes COMPRA) */
-            @keyframes pulse-gold {
-    0% { box-shadow: 0 0 18px rgba(255, 215, 0, 0.35); transform: scale(1.02); }
-    50% { box-shadow: 0 0 40px rgba(255, 215, 0, 0.70); transform: scale(1.045); }
-    100% { box-shadow: 0 0 18px rgba(255, 215, 0, 0.35); transform: scale(1.02); }
-}
-
-.lingotes-card-venta {
-    border: 3px solid #FFD700 !important;
-    background: radial-gradient(ellipse at top, rgba(255, 215, 0, 0.20), rgba(255, 215, 0, 0.06) 60%) !important;
-    animation: pulse-gold 2.8s ease-in-out infinite;
-}
-
-/* 🎨 ESTILO BLANCO TRANSLÚCIDO PARA COMPRA Y CONTRATACIÓN */
-.lingotes-card-blanca {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 2px solid rgba(255, 255, 255, 0.7) !important;
-    color: #ffffff !important;
-}
-            #hora-actualizacion-lingotes {
-    display: none !important;
-            }
-
-        </style>
     </head>
     <body>
         {%app_entry%}
@@ -264,9 +162,7 @@ app.index_string = '''
 </html>
 '''
 
-# ======================================================
 # EXTRACCIÓN DE DATOS (fuentes externas)
-# ======================================================
 def obtener_dolar_bogota():
     try:
         print("🔄 Extrayendo datos Banco Bogotá...")
@@ -369,9 +265,7 @@ def calcular_precios_tiempo_real():
             'actualizado': f"Error - {datetime.now().strftime('%H:%M:%S')}"
         }
 
-# ======================================================
 # COMPONENTES / WIDGETS
-# ======================================================
 def crear_logo():
     try:
         with open(LOGO_PATH, "rb") as f:
@@ -398,10 +292,11 @@ def crear_tirilla_estilo_banco(precios):
         print(f"⚠️ Error en tirilla: {e}")
         return html.Div("Cargando...", className="tirilla-container")
 
-# ======================================================
 # LAYOUT LINGOTES
-# ======================================================
 def layout_lingotes():
+    # Cargar SIEMPRE los porcentajes actuales desde el JSON
+    percentages_data = persistence_manager.load_percentages()
+
     header = html.Div([
         dbc.Row([
             dbc.Col([crear_logo()], width=3),
@@ -410,9 +305,7 @@ def layout_lingotes():
         html.Button("👤", id="open-login-modal", className="icon-btn", n_clicks=0)
     ], style={"position": "relative"})
 
-    # ======================================================
     # MODAL UNIFICADO: LOGIN + ACTUALIZAR USUARIO/CONTRASEÑA
-    # ======================================================
     modal = dbc.Modal([
         dbc.ModalHeader("Acceso Administrativo"),
         dbc.ModalBody([
@@ -511,10 +404,11 @@ def layout_lingotes():
     ])
 
 
-# ======================================================
 # LAYOUT DASHBOARD
-# ======================================================
 def create_dashboard_layout():
+    # 👉 Cargar SIEMPRE los porcentajes actualizados del JSON
+    percentages_data = persistence_manager.load_percentages()
+
     header = html.Div([
         dbc.Row([
             dbc.Col([crear_logo()], width=3),
@@ -522,9 +416,8 @@ def create_dashboard_layout():
         ], className="header-container"),
         html.A("⬅", href="/", className="icon-btn", id="go-back-btn")
     ], style={"position": "relative"})
-        # ======================================================
+
     # MODAL UNIFICADO: LOGIN + ACTUALIZAR USUARIO/CONTRASEÑA
-    # ======================================================
     modal = dbc.Modal([
         dbc.ModalHeader("Acceso Administrativo"),
         dbc.ModalBody([
@@ -579,6 +472,7 @@ def create_dashboard_layout():
             header,
             html.Hr(className="divider"),
 
+            # BLOQUE DE PRECIOS
             dbc.Row([
                 dbc.Col([
                     html.Div([
@@ -586,31 +480,42 @@ def create_dashboard_layout():
                         html.Table([
                             html.Tr([html.Th("CONCEPTO"), html.Th("VALOR")]),
                             html.Tr([
-    html.Td([
-        "TRM (BanRep)",
-        html.Button("✏️", id="editar-trm-btn", n_clicks=0,
-                    style={
-                        "marginLeft": "8px",
-                        "border": "none",
-                        "background": "transparent",
-                        "cursor": "pointer",
-                        "fontSize": "16px"
-                    })
-    ]),
-    html.Td(id="trm-anterior")
-]),
-
+                                html.Td([
+                                    "TRM (BanRep)",
+                                    html.Button("✏️", id="editar-trm-btn", n_clicks=0,
+                                                style={
+                                                    "marginLeft": "8px",
+                                                    "border": "none",
+                                                    "background": "transparent",
+                                                    "cursor": "pointer",
+                                                    "fontSize": "16px"
+                                                })
+                                ]),
+                                html.Td(id="trm-anterior")
+                            ]),
                             html.Tr([html.Td("ONZA (INV)"), html.Td(id="oro-anterior")]),
                             html.Tr([html.Td("PRECIO FULL"), html.Td(id="full-anterior")]),
                         ], className="price-table"),
-                        html.Div(id="trm-editor", style={"display": "none", "marginTop": "10px"}, children=[
-                        dcc.Input(id="input-trm-manual", type="number", placeholder="Ingrese TRM manual", 
-                        style={"width": "60%", "marginRight": "8px"}),
-                        html.Button("Guardar", id="guardar-trm-btn", n_clicks=0,
-                        style={"backgroundColor": "#FFD700", "border": "none", 
-                       "padding": "5px 10px", "fontWeight": "bold"})
-]),
 
+                        html.Div(id="trm-editor", style={"display": "none", "marginTop": "10px"}, children=[
+                            dcc.Input(
+                                id="input-trm-manual",
+                                type="number",
+                                placeholder="Ingrese TRM manual",
+                                style={"width": "60%", "marginRight": "8px"}
+                            ),
+                            html.Button(
+                                "Guardar",
+                                id="guardar-trm-btn",
+                                n_clicks=0,
+                                style={
+                                    "backgroundColor": "#FFD700",
+                                    "border": "none",
+                                    "padding": "5px 10px",
+                                    "fontWeight": "bold"
+                                }
+                            )
+                        ]),
                         html.Div(id='hora-anterior', className="refresh-indicator")
                     ], className="price-block price-block-anterior")
                 ], width=6),
@@ -620,75 +525,141 @@ def create_dashboard_layout():
                 ], width=6),
             ]),
 
+          
+            # BLOQUE DE VENTAS DETALLADAS + COMPRA + CONTRATACIÓN
             dbc.Row([
+                # Columna izquierda: Ventas detalladas
                 dbc.Col([
                     html.Div([
-                        html.H3("CALCULADORA DE PRECIOS", className="section-title"),
+                        html.Div("VENTAS DETALLADAS", className="calc-header",
+                                 style={"color": "#FFD700", "fontSize": "1.1em"}),
+
                         dbc.Row([
-                            # Primer bloque: VENTA
                             dbc.Col([
-                                html.Div([
-                                    html.Div("VENTA", className="calc-header"),
-                                    dbc.Row([
-                                        dbc.Col([
-                                            dcc.Input(id='input-compra', value=f"{percentages_data['compra']:.1f}",
-                                                      type='text', className='dash-input', placeholder='% venta')
-                                        ], width=8),
-                                        dbc.Col([
-                                            html.Button("APLICAR", id='btn-compra', n_clicks=0, className='dash-button')
-                                        ], width=4)
-                                    ]),
-                                    html.Div(id='label-compra', className="calc-label"),
-                                    html.Div(id='resultado-compra', className="calc-result")
-                                ], className="calc-item")
+                                html.Div("1 Gr", className="calc-label"),
+                                dcc.Input(id="input-venta-1gr",
+                                          value=f"{percentages_data.get('venta_1gr',0.0):.1f}",
+                                          type="text", className="dash-input",
+                                          placeholder="% 1 GR"),
+                                html.Button("APLICAR", id="btn-venta-1gr", n_clicks=0,
+                                            className="dash-button"),
+                                html.Div(id="resultado-venta-1gr", className="calc-result")
+                            ], width=3),
+
+                            dbc.Col([
+                                html.Div("5 GR", className="calc-label"),
+                                dcc.Input(id="input-venta-5gr",
+                                          value=f"{percentages_data.get('venta_5gr',0.0):.1f}",
+                                          type="text", className="dash-input",
+                                          placeholder="% 5 GR"),
+                                html.Button("APLICAR", id="btn-venta-5gr", n_clicks=0,
+                                            className="dash-button"),
+                                html.Div(id="resultado-venta-5gr", className="calc-result")
+                            ], width=3),
+
+                            dbc.Col([
+                                html.Div("10 GR", className="calc-label"),
+                                dcc.Input(id="input-venta-10gr",
+                                          value=f"{percentages_data.get('venta_10gr',0.0):.1f}",
+                                          type="text", className="dash-input",
+                                          placeholder="% 10 GR"),
+                                html.Button("APLICAR", id="btn-venta-10gr", n_clicks=0,
+                                            className="dash-button"),
+                                html.Div(id="resultado-venta-10gr", className="calc-result")
+                            ], width=3),
+
+                            dbc.Col([
+                                html.Div("20 GR", className="calc-label"),
+                                dcc.Input(id="input-venta-20gr",
+                                          value=f"{percentages_data.get('venta_20gr',0.0):.1f}",
+                                          type="text", className="dash-input",
+                                          placeholder="% 20 GR"),
+                                html.Button("APLICAR", id="btn-venta-20gr", n_clicks=0,
+                                            className="dash-button"),
+                                html.Div(id="resultado-venta-20gr", className="calc-result")
+                            ], width=3),
+                        ]),
+
+                        dbc.Row([
+                            dbc.Col([
+                                html.Div("1 OZ", className="calc-label"),
+                                dcc.Input(id="input-venta-1oz",
+                                          value=f"{percentages_data.get('venta_1oz',0.0):.1f}",
+                                          type="text", className="dash-input",
+                                          placeholder="% 1 OZ"),
+                                html.Button("APLICAR", id="btn-venta-1oz", n_clicks=0,
+                                            className="dash-button"),
+                                html.Div(id="resultado-venta-1oz", className="calc-result")
                             ], width=4),
 
-                            # Segundo bloque: COMPRA
                             dbc.Col([
-                                html.Div([
-                                    html.Div("COMPRA", className="calc-header"),
-                                    dbc.Row([
-                                        dbc.Col([
-                                            dcc.Input(id='input-venta', value=f"{percentages_data['venta']:.1f}",
-                                                      type='text', className='dash-input', placeholder='% compra')
-                                        ], width=8),
-                                        dbc.Col([
-                                            html.Button("APLICAR", id='btn-venta', n_clicks=0, className='dash-button')
-                                        ], width=4)
-                                    ]),
-                                    html.Div(id='label-venta', className="calc-label"),
-                                    html.Div(id='resultado-venta', className="calc-result")
-                                ], className="calc-item")
+                                html.Div("100 GR", className="calc-label"),
+                                dcc.Input(id="input-venta-100gr",
+                                          value=f"{percentages_data.get('venta_100gr',0.0):.1f}",
+                                          type="text", className="dash-input",
+                                          placeholder="% 100 GR"),
+                                html.Button("APLICAR", id="btn-venta-100gr", n_clicks=0,
+                                            className="dash-button"),
+                                html.Div(id="resultado-venta-100gr", className="calc-result")
                             ], width=4),
 
-                            # Tercer bloque: CONTRATACIÓN
                             dbc.Col([
-                                html.Div([
-                                    html.Div("CONTRATACIÓN", className="calc-header"),
-                                    dbc.Row([
-                                        dbc.Col([
-                                            dcc.Input(id='input-venta-directa', value=f"{percentages_data['venta_directa']:.1f}",
-                                                      type='text', className='dash-input', placeholder='% contratación')
-                                        ], width=8),
-                                        dbc.Col([
-                                            html.Button("APLICAR", id='btn-venta-directa', n_clicks=0, className='dash-button')
-                                        ], width=4)
-                                    ]),
-                                    html.Div(id='label-venta-directa', className="calc-label"),
-                                    html.Div(id='resultado-venta-directa', className="calc-result")
-                                ], className="calc-item")
+                                html.Div("200 GR", className="calc-label"),
+                                dcc.Input(id="input-venta-200gr",
+                                          value=f"{percentages_data.get('venta_200gr',0.0):.1f}",
+                                          type="text", className="dash-input",
+                                          placeholder="% 200 GR"),
+                                html.Button("APLICAR", id="btn-venta-200gr", n_clicks=0,
+                                            className="dash-button"),
+                                html.Div(id="resultado-venta-200gr", className="calc-result")
                             ], width=4),
                         ])
-                    ], className="calculator-horizontal")
-                ], width=12),
-            ]),
+                    ], className="calc-item")
+                ], width=6),
+
+                # Columna derecha: Compra + Contratación
+                dbc.Col([
+                    html.Div([
+                        html.Div("COMPRA", className="calc-header"),
+                        dbc.Row([
+                            dbc.Col([
+                                dcc.Input(id='input-venta',
+                                          value=f"{percentages_data['venta']:.1f}",
+                                          type='text', className='dash-input',
+                                          placeholder='% compra')
+                            ], width=8),
+                            dbc.Col([
+                                html.Button("APLICAR", id='btn-venta',
+                                            n_clicks=0, className='dash-button')
+                            ], width=4)
+                        ]),
+                        html.Div(id='label-venta', className="calc-label"),
+                        html.Div(id='resultado-venta', className="calc-result"),
+
+                        html.Hr(style={"margin": "25px 0"}),
+
+                        html.Div("CONTRATACIÓN", className="calc-header"),
+                        dbc.Row([
+                            dbc.Col([
+                                dcc.Input(id='input-venta-directa',
+                                          value=f"{percentages_data['venta_directa']:.1f}",
+                                          type='text', className='dash-input',
+                                          placeholder='% contratación')
+                            ], width=8),
+                            dbc.Col([
+                                html.Button("APLICAR", id='btn-venta-directa',
+                                            n_clicks=0, className='dash-button')
+                            ], width=4)
+                        ]),
+                        html.Div(id='label-venta-directa', className="calc-label"),
+                        html.Div(id='resultado-venta-directa', className="calc-result")
+                    ], className="calc-item")
+                ], width=5)
+            ])
         ], className="container-wide")
     ])
 
-
-# ======================================================
 # LAYOUT RAÍZ + NAVEGACIÓN
-# ======================================================
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content')
@@ -703,27 +674,29 @@ def display_page(pathname):
         return create_dashboard_layout()
     return layout_lingotes()
 
-
-# ======================================================
 # CALLBACKS LINGOTES
-# ======================================================
 @app.callback(
-    [Output('valor-compra-lingotes', 'children'),
-     Output('porcentaje-compra-lingotes', 'children'),
-     Output('valor-venta-lingotes', 'children'),
-     Output('porcentaje-venta-lingotes', 'children'),
-     Output('valor-venta-directa-lingotes', 'children'),
-     Output('porcentaje-venta-directa-lingotes', 'children'),
-     Output('hora-actualizacion-lingotes', 'children')],
+    [
+        Output('valor-compra-lingotes', 'children'),        # aquí irá la lista 1gr, 5gr, ...
+        Output('porcentaje-compra-lingotes', 'children'),   # lo dejamos vacío
+        Output('valor-venta-lingotes', 'children'),         # COMPRA (precio único)
+        Output('porcentaje-venta-lingotes', 'children'),
+        Output('valor-venta-directa-lingotes', 'children'), # CONTRATACIÓN (precio único)
+        Output('porcentaje-venta-directa-lingotes', 'children'),
+        Output('hora-actualizacion-lingotes', 'children'),
+    ],
     [Input('interval-lingotes', 'n_intervals')]
 )
 def actualizar_lingotes(n):
     """
-    Calcula los valores de los tres cuadros en la vista LINGOTES
-    usando la misma TRM (manual o automática) y el mismo oro del día anterior.
+    LINGOTES:
+    - VENTA (tarjeta resaltada): muestra 1gr, 5gr, 10gr, 20gr, 1oz, 100gr, 200gr
+      usando los porcentajes venta_1gr, venta_5gr, etc.
+    - COMPRA: un solo precio usando porcentaje 'venta'
+    - CONTRATACIÓN: un solo precio usando porcentaje 'venta_directa'
     """
     try:
-        # 🟡 1. Cargar los porcentajes guardados
+        # 🟡 1. Cargar TODOS los porcentajes guardados
         data = persistence_manager.load_percentages()
 
         # 🟡 2. Obtener TRM (manual si existe)
@@ -732,39 +705,102 @@ def actualizar_lingotes(n):
         # 🟡 3. Obtener el oro del día anterior
         oro_anterior = obtener_oro_dia_anterior()
         if isinstance(oro_anterior, tuple):
-            oro_anterior = oro_anterior[0]  # En caso de que devuelva tupla
+            oro_anterior = oro_anterior[0]
 
-        # 🟡 4. Calcular el precio base unificado
-        precio_base = (oro_anterior / 31.10347) * trm
+        # 🟡 4. Precio base por gramo (FULL del día anterior)
+        precio_base_gr = (oro_anterior / 31.10347) * trm
 
-        # 🟡 5. Calcular precios finales según porcentajes
-        precio_venta = precio_base * (1 + data['compra'] / 100.0)  # VENTA (resaltada)
-        precio_compra = precio_base * (1 + data['venta'] / 100.0)  # COMPRA
-        precio_directa = precio_base * (1 + data['venta_directa'] / 100.0)  # CONTRATACIÓN
+        # =============== VENTA DETALLADA (tarjeta que brilla) ===============
+        factores = {
+            "1gr": 1,
+            "5gr": 5,
+            "10gr": 10,
+            "20gr": 20,
+            "1oz": 31.10347,
+            "100gr": 100,
+            "200gr": 200,
+        }
 
-        # 🟡 6. Formatear resultados visuales
-        valor_venta = f"${formato_colombiano(precio_venta)}"
-        porcentaje_venta = f"+{data['compra']:.1f}%" if data['compra'] != 0.0 else "0.0%"
+        venta_1gr   = precio_base_gr * factores["1gr"]   * (1 + data["venta_1gr"]   / 100.0)
+        venta_5gr   = precio_base_gr * factores["5gr"]   * (1 + data["venta_5gr"]   / 100.0)
+        venta_10gr  = precio_base_gr * factores["10gr"]  * (1 + data["venta_10gr"]  / 100.0)
+        venta_20gr  = precio_base_gr * factores["20gr"]  * (1 + data["venta_20gr"]  / 100.0)
+        venta_1oz   = precio_base_gr * factores["1oz"]   * (1 + data["venta_1oz"]   / 100.0)
+        venta_100gr = precio_base_gr * factores["100gr"] * (1 + data["venta_100gr"] / 100.0)
+        venta_200gr = precio_base_gr * factores["200gr"] * (1 + data["venta_200gr"] / 100.0)
 
+        # Construimos el contenido de la tarjeta VENTA como una pequeña lista/tabla
+        bloque_venta_detallada = html.Div(
+    [
+        html.Div([
+            html.Span("  1    Gr", className="venta-label"),
+            html.Span(f"${formato_colombiano(venta_1gr)}", className="venta-valor"),
+        ], className="venta-row"),
+
+        html.Div([
+            html.Span("  5    Gr", className="venta-label"),
+            html.Span(f"${formato_colombiano(venta_5gr)}", className="venta-valor"),
+        ], className="venta-row"),
+
+        html.Div([
+            html.Span(" 10   Gr", className="venta-label"),
+            html.Span(f"${formato_colombiano(venta_10gr)}", className="venta-valor"),
+        ], className="venta-row"),
+
+        html.Div([
+            html.Span(" 20   Gr", className="venta-label"),
+            html.Span(f"${formato_colombiano(venta_20gr)}", className="venta-valor"),
+        ], className="venta-row"),
+
+        html.Div([
+            html.Span("  1    Oz", className="venta-label"),
+            html.Span(f"${formato_colombiano(venta_1oz)}", className="venta-valor"),
+        ], className="venta-row"),
+
+        html.Div([
+            html.Span("100 Gr", className="venta-label"),
+            html.Span(f"${formato_colombiano(venta_100gr)}", className="venta-valor"),
+        ], className="venta-row"),
+
+        html.Div([
+            html.Span("200 Gr", className="venta-label"),
+            html.Span(f"${formato_colombiano(venta_200gr)}", className="venta-valor"),
+        ], className="venta-row"),
+    ],
+    className="venta-detallada-container",
+)
+        # No queremos texto tipo "Aplicando 0.0%" aquí
+        texto_porcentaje_venta_card = ""
+
+        # =============== COMPRA (precio único) ===============
+        precio_compra = precio_base_gr * (1 + data["venta"] / 100.0)
         valor_compra = f"${formato_colombiano(precio_compra)}"
-        porcentaje_compra = f"+{data['venta']:.1f}%" if data['venta'] != 0.0 else "0.0%"
+        porcentaje_compra = f"+{data['venta']:.1f}%" if data["venta"] != 0.0 else ""
 
+        # =============== CONTRATACIÓN (precio único) ===============
+        precio_directa = precio_base_gr * (1 + data["venta_directa"] / 100.0)
         valor_directa = f"${formato_colombiano(precio_directa)}"
-        porcentaje_directa = f"+{data['venta_directa']:.1f}%" if data['venta_directa'] != 0.0 else "0.0%"
+        porcentaje_directa = f"+{data['venta_directa']:.1f}%" if data["venta_directa"] != 0.0 else ""
 
+        # =============== Hora de actualización ===============
         hora_actualizacion = f"Actualizado: {datetime.now().strftime('%H:%M:%S')}"
 
-        return (valor_venta, porcentaje_venta,
-                valor_compra, porcentaje_compra,
-                valor_directa, porcentaje_directa,
-                hora_actualizacion)
+        return (
+            bloque_venta_detallada,          # contenido tarjeta VENTA
+            texto_porcentaje_venta_card,     # vacío
+            valor_compra, porcentaje_compra, # COMPRA
+            valor_directa, porcentaje_directa,  # CONTRATACIÓN
+            hora_actualizacion,
+        )
+
     except Exception as e:
         print(f"❌ Error actualizando LINGOTES: {e}")
-        return ("Error", "0.0%", "Error", "0.0%", "Error", "0.0%", f"Error: {e}")
+        return (
+            "Error", "", "Error", "", "Error", "", f"Error: {e}"
+        )
 
-# ======================================================
+
 # LOGIN + CAMBIO DE CREDENCIALES (en el mismo modal)
-# ======================================================
 from werkzeug.security import generate_password_hash
 # 🔍 Test de validación de hash
 test_hash = "pbkdf2:sha256:600000$3C4mkOu2RNRVG28Z$a2b7f47a27a7b64e4f67c527bcb5b514183fd9d2e17d556e31da4f48e5678e40"
@@ -876,9 +912,7 @@ def manejar_modal_login(open_click, cancel_click, login_click, show_update_click
 
 
 
-# ======================================================
 # CALLBACKS PRINCIPALES DEL DASHBOARD
-# ======================================================
 @app.callback(
     [Output('store-precios', 'data'),
      Output('tirilla-content', 'children'),
@@ -955,158 +989,6 @@ def actualizar_tabla_anterior(n):
         print(f"❌ Error actualizando tabla del día anterior: {e}")
         return "Error", "Error", "Error", f"Error: {e}"
 
-
-# ======================================================
-# CÁLCULOS / PERSISTENCIA - DASHBOARD
-# ======================================================
-@app.callback(
-    [Output('resultado-compra', 'children'),
-     Output('label-compra', 'children'),
-     Output('resultado-venta', 'children'),
-     Output('label-venta', 'children'),
-     Output('resultado-venta-directa', 'children'),
-     Output('label-venta-directa', 'children'),
-     Output('store-datos-anteriores', 'data', allow_duplicate=True)],  # 👈 añadimos este Output
-    [Input('btn-compra', 'n_clicks'),
-     Input('btn-venta', 'n_clicks'),
-     Input('btn-venta-directa', 'n_clicks')],
-    [State('input-compra', 'value'),
-     State('input-venta', 'value'),
-     State('input-venta-directa', 'value'),
-     State('store-datos-anteriores', 'data')],
-    prevent_initial_call=True
-)
-def calcular_precios(nc, nv, nd, pct_compra_str, pct_venta_str, pct_directa_str, datos_anteriores):
-    """Calcula los precios y guarda los porcentajes en disco."""
-    def parse_pct(s):
-        try:
-            return float(str(s).replace(",", ".")) if s not in (None, "") else 0.0
-        except:
-            return 0.0
-
-    # Convertir entradas
-    pct_compra = parse_pct(pct_compra_str)
-    pct_venta = parse_pct(pct_venta_str)
-    pct_directa = parse_pct(pct_directa_str)
-
-    # Precio base
-    if datos_anteriores and "full_cop" in datos_anteriores:
-        precio_base = datos_anteriores["full_cop"]
-    else:
-        precio_base = (1950.0 / 31.10347) * 3950.0
-
-    # Calcular precios ajustados
-    precio_compra = precio_base * (1 + pct_compra / 100.0)
-    precio_venta = precio_base * (1 + pct_venta / 100.0)
-    precio_directa = precio_base * (1 + pct_directa / 100.0)
-
-    # 💾 Guardar en JSON (persistencia real)
-    persistence_manager.save_percentages(pct_compra, pct_venta, pct_directa)
-
-    # 🔄 Actualizar store para reflejar cambios en la interfaz
-    datos_anteriores = datos_anteriores or {}
-    datos_anteriores.update({
-        "compra": pct_compra,
-        "venta": pct_venta,
-        "venta_directa": pct_directa
-    })
-
-    # Formato visual
-    res_compra = f"${formato_colombiano(precio_compra)}"
-    lbl_compra = f"VENTA (+{pct_compra:.1f}%)" if pct_compra != 0.0 else "VENTA"
-
-    res_venta = f"${formato_colombiano(precio_venta)}"
-    lbl_venta = f"COMPRA (+{pct_venta:.1f}%)" if pct_venta != 0.0 else "COMPRA"
-
-    res_directa = f"${formato_colombiano(precio_directa)}"
-    lbl_directa = f"CONTRATACIÓN (+{pct_directa:.1f}%)" if pct_directa != 0.0 else "CONTRATACIÓN"
-
-    return (
-        res_compra, lbl_compra,
-        res_venta, lbl_venta,
-        res_directa, lbl_directa,
-        datos_anteriores
-    )
-
-
-    # OJO: Los labels visibles cambian de nombre
-    res_compra = f"${formato_colombiano(precio_compra)}"
-    lbl_compra = f"VENTA (+{pct_compra:.1f}%)" if pct_compra != 0.0 else "VENTA"
-
-    res_venta = f"${formato_colombiano(precio_venta)}"
-    lbl_venta = f"COMPRA (+{pct_venta:.1f}%)" if pct_venta != 0.0 else "COMPRA"
-
-    res_dir = f"${formato_colombiano(precio_venta_directa)}"
-    lbl_dir = f"CONTRATACIÓN (+{pct_directa:.1f}%)" if pct_directa != 0.0 else "CONTRATACIÓN"
-
-    return res_compra, lbl_compra, res_venta, lbl_venta, res_dir, lbl_dir
-
-@app.callback(
-    [Output('input-compra', 'value'),
-     Output('input-venta', 'value'),
-     Output('input-venta-directa', 'value')],
-    [Input('store-datos-anteriores', 'data')],
-    prevent_initial_call=False
-)
-def sincronizar_inputs_con_json(datos_anteriores):
-    """Recarga los valores guardados en JSON al iniciar el dashboard."""
-    try:
-        data = persistence_manager.load_percentages()
-        return (
-            f"{data['compra']:.1f}",
-            f"{data['venta']:.1f}",
-            f"{data['venta_directa']:.1f}"
-        )
-    except Exception as e:
-        print(f"❌ Error sincronizando inputs: {e}")
-        return "0.0", "0.0", "0.0"
-
-
-@app.callback(
-    [Output('resultado-compra', 'children', allow_duplicate=True),
-     Output('label-compra', 'children', allow_duplicate=True),
-     Output('resultado-venta', 'children', allow_duplicate=True),
-     Output('label-venta', 'children', allow_duplicate=True),
-     Output('resultado-venta-directa', 'children', allow_duplicate=True),
-     Output('label-venta-directa', 'children', allow_duplicate=True)],
-    [Input('input-compra', 'value'),
-     Input('input-venta', 'value'),
-     Input('input-venta-directa', 'value'),
-     Input('store-datos-anteriores', 'data')],
-    [State('store-datos-anteriores', 'data')],
-    prevent_initial_call=True
-)
-def calcular_automatico(compra_str, venta_str, directa_str, _trigger, datos_anteriores):
-    def parse_pct(s):
-        try:
-            return float(str(s).replace(",", ".")) if s not in (None, "") else 0.0
-        except:
-            return 0.0
-    pct_compra, pct_venta, pct_directa = parse_pct(compra_str), parse_pct(venta_str), parse_pct(directa_str)
-
-    if datos_anteriores and "full_cop" in datos_anteriores:
-        precio_base = datos_anteriores["full_cop"]
-    else:
-        precio_base = (1950.0 / 31.10347) * 3950.0
-
-    precio_compra = precio_base * (1 + pct_compra / 100.0)
-    precio_venta = precio_base * (1 + pct_venta / 100.0)
-    precio_venta_directa = precio_base * (1 + pct_directa / 100.0)
-
-    res_compra = f"${formato_colombiano(precio_compra)}"
-    lbl_compra = f"VENTA (+{pct_compra:.1f}%)" if pct_compra != 0.0 else "VENTA"
-
-    res_venta = f"${formato_colombiano(precio_venta)}"
-    lbl_venta = f"COMPRA (+{pct_venta:.1f}%)" if pct_venta != 0.0 else "COMPRA"
-
-    res_dir = f"${formato_colombiano(precio_venta_directa)}"
-    lbl_dir = f"CONTRATACIÓN (+{pct_directa:.1f}%)" if pct_directa != 0.0 else "CONTRATACIÓN"
-
-    if any([pct_compra, pct_venta, pct_directa]):
-        persistence_manager.save_percentages(pct_compra, pct_venta, pct_directa)
-
-    return res_compra, lbl_compra, res_venta, lbl_venta, res_dir, lbl_dir
-
 @app.callback(
     Output("trm-editor", "style"),
     [Input("editar-trm-btn", "n_clicks")],
@@ -1155,9 +1037,258 @@ def guardar_trm_manual(n_clicks, trm_valor):
     # Si no hay valor o falla, no actualiza nada
     return dash.no_update, dash.no_update, dash.no_update
 
-# ======================================================
+
+# CALLBACKS PARA VENTAS DETALLADAS (1gr, 5gr, 10gr, etc.)
+@app.callback(
+    [
+        Output("resultado-venta-1gr", "children"),
+        Output("resultado-venta-5gr", "children"),
+        Output("resultado-venta-10gr", "children"),
+        Output("resultado-venta-20gr", "children"),
+        Output("resultado-venta-1oz", "children"),
+        Output("resultado-venta-100gr", "children"),
+        Output("resultado-venta-200gr", "children"),
+    ],
+    [
+        Input("btn-venta-1gr", "n_clicks"),
+        Input("btn-venta-5gr", "n_clicks"),
+        Input("btn-venta-10gr", "n_clicks"),
+        Input("btn-venta-20gr", "n_clicks"),
+        Input("btn-venta-1oz", "n_clicks"),
+        Input("btn-venta-100gr", "n_clicks"),
+        Input("btn-venta-200gr", "n_clicks"),
+    ],
+    [
+        State("store-datos-anteriores", "data"),
+        State("input-venta-1gr", "value"),
+        State("input-venta-5gr", "value"),
+        State("input-venta-10gr", "value"),
+        State("input-venta-20gr", "value"),
+        State("input-venta-1oz", "value"),
+        State("input-venta-100gr", "value"),
+        State("input-venta-200gr", "value"),
+    ],
+)
+def calcular_ventas_detalladas(n1, n5, n10, n20, noz, n100, n200,
+                               datos_anteriores,
+                               v1, v5, v10, v20, voz, v100, v200):
+
+    """
+    Calcula los precios finales de cada lingote con base en el precio full del día anterior
+    y guarda los porcentajes en el archivo JSON persistente.
+    """
+    def parse(v):
+        try:
+            return float(str(v).replace(",", ".")) if v not in (None, "") else 0.0
+        except:
+            return 0.0
+
+    try:
+        # 💰 Precio base del día anterior (full_cop)
+        # Si store-datos-anteriores está vacío, recalculamos el FULL real.
+        if not datos_anteriores or "full_cop" not in datos_anteriores:
+            trm, _ = obtener_trm_banrep()
+            oro_anterior = obtener_oro_dia_anterior()
+            if isinstance(oro_anterior, tuple):
+                oro_anterior = oro_anterior[0]
+            precio_full = (oro_anterior / 31.10347) * trm
+        else:
+            precio_full = datos_anteriores["full_cop"]
+
+        # Multiplicadores por peso
+        factores = {
+            "1gr": 1,
+            "5gr": 5,
+            "10gr": 10,
+            "20gr": 20,
+            "1oz": 31.10347,
+            "100gr": 100,
+            "200gr": 200
+        }
+
+        # Leer porcentajes desde los inputs
+        v1, v5, v10, v20, voz, v100, v200 = map(parse, [v1, v5, v10, v20, voz, v100, v200])
+
+        # Calcular resultados
+        r1   = precio_full * factores["1gr"]   * (1 + v1  / 100)
+        r5   = precio_full * factores["5gr"]   * (1 + v5  / 100)
+        r10  = precio_full * factores["10gr"]  * (1 + v10 / 100)
+        r20  = precio_full * factores["20gr"]  * (1 + v20 / 100)
+        roz  = precio_full * factores["1oz"]   * (1 + voz / 100)
+        r100 = precio_full * factores["100gr"] * (1 + v100 / 100)
+        r200 = precio_full * factores["200gr"] * (1 + v200 / 100)
+
+        # 💾 Guardar porcentajes en JSON
+        data_actual = persistence_manager.load_percentages()
+        persistence_manager.save_percentages(
+            compra=data_actual.get("compra", 0.0),
+            venta=data_actual.get("venta", 0.0),
+            venta_directa=data_actual.get("venta_directa", 0.0),
+            venta_1gr=v1, venta_5gr=v5, venta_10gr=v10,
+            venta_20gr=v20, venta_1oz=voz,
+            venta_100gr=v100, venta_200gr=v200
+        )
+
+        def fmt(v):
+            return f"${formato_colombiano(v)}"
+
+        return fmt(r1), fmt(r5), fmt(r10), fmt(r20), fmt(roz), fmt(r100), fmt(r200)
+
+    except Exception as e:
+        print(f"❌ Error calculando ventas detalladas: {e}")
+        return ["Error"] * 7
+    
+# === REINICIALIZAR RESULTADOS AL CARGAR LA PÁGINA ===
+@app.callback(
+    [
+        Output("input-venta-1gr", "value"),
+        Output("input-venta-5gr", "value"),
+        Output("input-venta-10gr", "value"),
+        Output("input-venta-20gr", "value"),
+        Output("input-venta-1oz", "value"),
+        Output("input-venta-100gr", "value"),
+        Output("input-venta-200gr", "value"),
+    ],
+    [Input("store-porcentajes-lingotes", "data")],
+    prevent_initial_call=True
+)
+def cargar_porcentajes_guardados(p):
+    """Carga los porcentajes anteriores en los inputs al abrir la página."""
+    try:
+        return (
+            f"{p['venta_1gr']:.1f}",
+            f"{p['venta_5gr']:.1f}",
+            f"{p['venta_10gr']:.1f}",
+            f"{p['venta_20gr']:.1f}",
+            f"{p['venta_1oz']:.1f}",
+            f"{p['venta_100gr']:.1f}",
+            f"{p['venta_200gr']:.1f}",
+        )
+    except:
+        return ["0.0"] * 7
+    
+# =======================
+# CALLBACK: COMPRA (panel derecho)
+# =======================
+@app.callback(
+    [
+        Output("label-venta", "children"),
+        Output("resultado-venta", "children"),
+    ],
+    Input("btn-venta", "n_clicks"),
+    [
+        State("input-venta", "value"),
+        State("store-datos-anteriores", "data"),
+    ],
+    # Queremos que se ejecute también al cargar la página
+    prevent_initial_call=False
+)
+def calcular_compra(n_clicks, porcentaje_str, datos_anteriores):
+    # Parsear porcentaje desde el input (viene del JSON al cargar la página)
+    try:
+        porcentaje = float(str(porcentaje_str).replace(",", ".")) if porcentaje_str else 0.0
+    except Exception:
+        porcentaje = 0.0
+
+    # FULL del día anterior
+    if not datos_anteriores or "full_cop" not in datos_anteriores:
+        trm, _ = obtener_trm_banrep()
+        oro_anterior = obtener_oro_dia_anterior()
+        if isinstance(oro_anterior, tuple):
+            oro_anterior = oro_anterior[0]
+        precio_full = (oro_anterior / 31.10347) * trm
+    else:
+        precio_full = datos_anteriores["full_cop"]
+
+    precio = precio_full * (1 + porcentaje / 100.0)
+
+    # 💾 Guardar en JSON (actualizando SOLO 'venta')
+    data_actual = persistence_manager.load_percentages()
+    persistence_manager.save_percentages(
+        compra=data_actual.get("compra", 0.0),
+        venta=porcentaje,
+        venta_directa=data_actual.get("venta_directa", 0.0),
+        venta_1gr=data_actual.get("venta_1gr", 0.0),
+        venta_5gr=data_actual.get("venta_5gr", 0.0),
+        venta_10gr=data_actual.get("venta_10gr", 0.0),
+        venta_20gr=data_actual.get("venta_20gr", 0.0),
+        venta_1oz=data_actual.get("venta_1oz", 0.0),
+        venta_100gr=data_actual.get("venta_100gr", 0.0),
+        venta_200gr=data_actual.get("venta_200gr", 0.0),
+    )
+
+    # Texto solo si el porcentaje es distinto de 0
+    if porcentaje == 0.0:
+        texto = ""
+    else:
+        texto = f""
+
+    resultado = f"${formato_colombiano(precio)}"
+
+    return texto, resultado
+
+
+# ==========================
+# CALLBACK: CONTRATACIÓN
+# ==========================
+@app.callback(
+    [
+        Output("label-venta-directa", "children"),
+        Output("resultado-venta-directa", "children"),
+    ],
+    Input("btn-venta-directa", "n_clicks"),
+    [
+        State("input-venta-directa", "value"),
+        State("store-datos-anteriores", "data"),
+    ],
+    # También se ejecuta al cargar para mostrar lo guardado
+    prevent_initial_call=False
+)
+def calcular_contratacion(n_clicks, porcentaje_str, datos_anteriores):
+    # Parsear porcentaje
+    try:
+        porcentaje = float(str(porcentaje_str).replace(",", ".")) if porcentaje_str else 0.0
+    except Exception:
+        porcentaje = 0.0
+
+    # FULL del día anterior
+    if not datos_anteriores or "full_cop" not in datos_anteriores:
+        trm, _ = obtener_trm_banrep()
+        oro_anterior = obtener_oro_dia_anterior()
+        if isinstance(oro_anterior, tuple):
+            oro_anterior = oro_anterior[0]
+        precio_full = (oro_anterior / 31.10347) * trm
+    else:
+        precio_full = datos_anteriores["full_cop"]
+
+    precio = precio_full * (1 + porcentaje / 100.0)
+
+    # 💾 Guardar en JSON (actualizando SOLO 'venta_directa')
+    data_actual = persistence_manager.load_percentages()
+    persistence_manager.save_percentages(
+        compra=data_actual.get("compra", 0.0),
+        venta=data_actual.get("venta", 0.0),
+        venta_directa=porcentaje,
+        venta_1gr=data_actual.get("venta_1gr", 0.0),
+        venta_5gr=data_actual.get("venta_5gr", 0.0),
+        venta_10gr=data_actual.get("venta_10gr", 0.0),
+        venta_20gr=data_actual.get("venta_20gr", 0.0),
+        venta_1oz=data_actual.get("venta_1oz", 0.0),
+        venta_100gr=data_actual.get("venta_100gr", 0.0),
+        venta_200gr=data_actual.get("venta_200gr", 0.0),
+    )
+
+    # Texto solo si el porcentaje es distinto de 0
+    if porcentaje == 0.0:
+        texto = ""
+    else:
+        texto = f""
+
+    resultado = f"${formato_colombiano(precio)}"
+
+    return texto, resultado
+
 # MAIN
-# ======================================================
 if __name__ == '__main__':
     
     print("\n" + "="*60)
@@ -1167,11 +1298,6 @@ if __name__ == '__main__':
     print("   🌐 LINGOTES:  http://localhost:8050/")
     print("   📈 DASHBOARD: http://localhost:8050/dashboard")
     print("\n📁 CARACTERÍSTICAS:")
-    print("   ✅ Estética unificada (fondos, header, logo)")
-    print("   ✅ Engranaje (login) en LINGOTES → redirige al dashboard si ok")
-    print("   ✅ Flecha '←' en Dashboard (arriba derecha) para volver a LINGOTES")
-    print("   ✅ Persistencia REAL en disco (JSON)")
-    print("   ✅ Cálculos y sincronización automática")
     print(f"📁 Archivo JSON: {persistence_manager.percentages_file}")
     print("="*60)
     app.run(host='0.0.0.0', debug=False, port=8050)

@@ -1,0 +1,452 @@
+:root {
+    --primary-gold: #FFD700;
+    --dark-bg: #171c26;
+    --card-bg-yellow: rgba(255, 196, 12, 0.85);
+    --card-bg-white: rgba(248, 249, 250, 0.85);
+    --text-dark: #171c26;
+    --text-light: #ecf0f1;
+    --accent-blue: #2c3e50;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body, html {
+    height: 100%;
+    background: linear-gradient(135deg, var(--dark-bg) 0%, #2c3e50 100%) !important;
+    background-attachment: fixed;
+    background-size: cover;
+}
+
+body {
+    background-color: var(--dark-bg) !important;
+    font-family: "Arial", "Helvetica", sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+.container-wide {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.header-container {
+    height: 85px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+    justify-content: space-between;
+    position: relative;
+}
+
+.logo-img {
+    max-height: 75px;
+    max-width: 330px;
+    object-fit: contain;
+}
+
+/* ====== TIRILLA BANCO ====== */
+.tirilla-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    background: transparent !important;
+    margin-left: 20px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.tirilla-wrapper {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    height: 30px;
+    display: flex;
+    align-items: center;
+}
+
+.tirilla-marquee {
+    display: inline-block;
+    white-space: nowrap;
+    animation: marquee 20s linear infinite;
+    color: #00FF00;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: "Calibri", "Arial", sans-serif;
+    padding: 6px 0;
+    position: absolute;
+    left: 100%;
+}
+
+.tirilla-marquee:hover {
+    animation-play-state: paused;
+}
+
+@keyframes marquee {
+    0% { left: 100%; }
+    100% { left: -100%; }
+}
+
+.tirilla-time {
+    color: #00FF00;
+    font-weight: bold;
+}
+
+.tirilla-venta,
+.tirilla-compra {
+    color: #FFFFFF;
+    font-weight: bold;
+}
+
+.divider {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--primary-gold), transparent);
+    margin: 8px 0;
+}
+
+/* ====== ICON BUTTONS (gear & back) ====== */
+.icon-btn {
+    position: absolute;
+    top: 55px;
+    right: 10px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 2px solid var(--primary-gold);
+    background: rgba(255, 215, 0, 0.12);
+    color: var(--primary-gold);
+    font-weight: 900;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.icon-btn:hover {
+    transform: scale(1.07);
+    box-shadow: 0 6px 16px rgba(255,215,0,.25);
+    background: rgba(255,215,0,0.18);
+}
+
+.icon-btn:focus {
+    outline: none;
+}
+
+/* ====== CARDS (PRECIOS) ====== */
+.price-block {
+    padding: 15px;
+    border-radius: 10px;
+    min-height: 240px;
+    margin-bottom: 15px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    backdrop-filter: blur(5px);
+}
+
+.price-block-anterior {
+    background: var(--card-bg-yellow);
+    color: var(--text-dark);
+    border: 2px solid #e0b000;
+}
+
+.price-block-vivo {
+    background: var(--card-bg-white);
+    color: var(--text-dark);
+    border: 2px solid #dee2e6;
+}
+
+.price-block-anterior *,
+.price-block-vivo * {
+    opacity: 1 !important;
+    color: inherit !important;
+}
+
+.block-title {
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    font-weight: 800;
+    text-transform: none;
+    letter-spacing: 0.5px;
+}
+
+/* ====== TABLAS DE PRECIO EN VIVO Y ANTERIOR ====== */
+.price-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95em;
+}
+
+.price-table th {
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 2px solid var(--text-dark);
+    font-weight: 700;
+    background-color: rgba(23, 28, 38, 0.1);
+}
+
+.price-table td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid rgba(23, 28, 38, 0.2);
+    font-weight: 600;
+}
+
+.refresh-indicator {
+    text-align: right;
+    font-size: 0.75em;
+    color: #6c757d;
+    margin-top: 12px;
+    font-style: italic;
+}
+
+/* ====== CALCULADORA ====== */
+.calc-item {
+    text-align: center;
+    padding: 10px 0;
+}
+
+/* Título superior */
+.calc-header {
+    color: var(--primary-gold);
+    font-weight: 700;
+    font-size: 1.05em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+/* Subtítulo de cada peso */
+.calc-label {
+    color: #bdc3c7;
+    font-size: 0.8em;
+    font-weight: 500;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+/* === INPUTS === */
+.dash-input {
+    width: 100%;
+    max-width: 150px;
+    height: 34px;
+    margin: 0 auto;
+    display: block;
+    text-align: center;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--text-dark);
+    border: 1.8px solid var(--primary-gold);
+    border-radius: 5px;
+    background: #fff;
+    transition: all 0.2s ease;
+}
+
+.dash-input:focus {
+    outline: none;
+    box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+}
+
+/* === BOTONES === */
+.dash-button {
+    width: 100%;
+    max-width: 120px;
+    height: 30px;
+    margin: 6px auto;
+    display: block;
+    background: linear-gradient(135deg, var(--primary-gold), #e6c200);
+    color: var(--text-dark);
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+}
+
+.dash-button:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+/* === RESULTADOS === */
+.calc-result {
+    width: 100%;
+    max-width: 150px;
+    height: 34px;
+    margin: 6px auto;
+    font-size: 0.95em;
+    font-weight: bold;
+    color: var(--primary-gold);
+    padding-top: 5px;
+    border: 1.8px solid var(--primary-gold);
+    border-radius: 5px;
+    background: rgba(255, 215, 0, 0.08);
+    text-align: center;
+}
+
+/* === CENTRADO DE COLUMNAS === */
+.calc-item .dbc-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ====== LINGOTES VIEW ====== */
+.lingotes-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--dark-bg) 0%, #2c3e50 100%);
+    padding: 2rem 0;
+}
+
+/* Fondo base común de los 3 cuadros */
+.lingotes-card {
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    border-radius: 15px;
+    padding: 2rem;
+    margin: 1rem 0;
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.lingotes-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+.lingotes-title {
+    color: var(--primary-gold);
+    font-size: 2.5rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.card-title {
+    color: var(--primary-gold);
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+}
+
+.card-value {
+    color: #ffffff;
+    font-size: 2rem;
+    font-weight: bold;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+/* Ocultar porcentajes en todos los cuadros */
+.card-percentage {
+    display: none !important;
+}
+
+/* ====== EFECTO ESPECIAL SOLO PARA VENTA ====== */
+@keyframes pulse-gold-border {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.0);
+    }
+    50% {
+        box-shadow: 0 0 30px 6px rgba(255, 215, 0, 0.75);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.0);
+    }
+}
+
+.lingotes-card-venta {
+    /* mismo fondo que los otros, solo cambia el marco */
+    border: 3px solid var(--primary-gold) !important;
+    animation: pulse-gold-border 2.6s ease-in-out infinite;
+}
+
+/* COMPRA y CONTRATACIÓN: estilo blanco translúcido como antes */
+.lingotes-card-blanca {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 2px solid rgba(255, 255, 255, 0.7) !important;
+    color: #ffffff !important;
+}
+
+/* ====== TABLA INTERNA DE VENTA (tipo Excel) ====== */
+
+/* Contenedor general de la tarjeta de VENTA */
+#card-venta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Caja que simula la tabla */
+#card-venta .venta-detallada-container {
+    width: 100%;
+    max-width: 340px;
+    margin-top: 0 rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.18);
+}
+
+/* Cada fila (1 GR, 5 GR, etc.) */
+#card-venta .venta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 80px;
+    font-size: 1.19rem;  /* TAMAÑO DE FUENTE DEL CUADRO DE VENTA PPAL */
+    font-weight: 300;
+    color: #ffffff;
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+#card-venta .venta-row:first-child {
+    border-top: none;
+}
+
+/* Columna izquierda: PESO */
+#card-venta .venta-label {
+    flex: 0 0 60%;
+    text-align: left;
+    text-transform: none !important;
+    letter-spacing: 0.6px;
+    padding-right: 18px;
+    position: relative;
+}
+
+/* Separador vertical entre peso y precio */
+#card-venta .venta-label::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    bottom: 44px;
+    right: 3px;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* Columna derecha: PRECIO */
+#card-venta .venta-valor {
+    flex: 1 1 auto;
+    text-align: right;
+    font-weight: 6800;
+    color: var(--primary-gold);
+}
+
+/* Hora en lingotes: oculta */
+#hora-actualizacion-lingotes {
+    display: none !important;
+}

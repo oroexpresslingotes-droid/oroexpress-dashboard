@@ -1,6 +1,13 @@
 {
-  "compra": 4.0,
-  "venta": 6.0,
-  "venta_directa": 2.0,
-  "last_updated": "2024-01-15 14:30:25"
+  "compra": -5.0,
+  "venta": 0.0,
+  "venta_directa": 10.0,
+  "venta_1gr": 0.0,
+  "venta_5gr": 0.0,
+  "venta_10gr": 0.0,
+  "venta_20gr": 0.0,
+  "venta_1oz": 0.0,
+  "venta_100gr": 0.0,
+  "venta_200gr": 0.0,
+  "last_updated": "2025-11-11 22:50:14"
 }
