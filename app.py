@@ -6,7 +6,6 @@ import pandas as pd
 import requests, re, os
 from datetime import datetime, date, timedelta
 from bs4 import BeautifulSoup
-import investpy
 import base64
 from pathlib import Path
 import json
@@ -203,40 +202,42 @@ def obtener_precio_oro_kitco():
 
 def obtener_trm_banrep():
     """
-    Devuelve la TRM oficial del día anterior o una TRM manual si está configurada.
-    Permite sobreescribir el valor desde un archivo local (trm_manual.json).
+    TRM día anterior vigente (OFICIAL – datos.gov.co).
+    Regla:
+    - Toma la TRM más reciente cuya fecha 'vigenciadesde' sea < hoy.
+    - Maneja automáticamente fines de semana y festivos.
     """
     try:
-        manual_file = Path("storage/trm_manual.json")
-        if manual_file.exists():
-            with open(manual_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                trm_manual = float(data.get("trm", 0))
-                fecha_manual = data.get("fecha", "manual")
-                if trm_manual > 0:
-                    print(f"📘 Usando TRM manual ({fecha_manual}): ${trm_manual:,.0f} COP")
-                    return trm_manual, fecha_manual
-
         hoy = date.today().isoformat()
-        url = "https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=5&$order=vigenciadesde%20desc"
+
+        url = (
+            "https://www.datos.gov.co/resource/32sa-8pi3.json"
+            "?$limit=10&$order=vigenciadesde DESC"
+        )
+
         r = requests.get(url, timeout=10)
+        r.raise_for_status()
         data = r.json()
+
+        # Buscar la primera TRM cuya vigencia sea ANTERIOR a hoy
         for item in data:
             fecha = item.get("vigenciadesde", "")[:10]
-            if fecha < hoy:
+            if fecha and fecha < hoy:
                 trm = float(item["valor"])
-                print(f"📅 TRM del día anterior ({fecha}): ${trm:,.0f} COP")
+                print(f"📅 TRM día anterior vigente ({fecha}): {trm}")
                 return trm, fecha
 
+        # Fallback de seguridad
         ultima = data[0]
         trm = float(ultima["valor"])
-        fecha = ultima["vigenciadesde"][:10]
-        print(f"⚠️ Fallback TRM última publicada ({fecha}): ${trm:,.0f} COP")
+        fecha = ultima.get("vigenciadesde", "")[:10]
+        print(f"⚠️ Fallback TRM ({fecha}): {trm}")
         return trm, fecha
+
     except Exception as e:
-        print(f"❌ Error al obtener TRM: {e}")
+        print(f"❌ Error TRM datos.gov.co: {e}")
         return 3950.0, "Error"
-    
+
 def formato_colombiano(valor):
     """Formatea números en estilo colombiano SIN decimales."""
     try:
@@ -297,6 +298,9 @@ def layout_lingotes():
     # Cargar SIEMPRE los porcentajes actuales desde el JSON
     percentages_data = persistence_manager.load_percentages()
 
+    # ======================
+    # HEADER
+    # ======================
     header = html.Div([
         dbc.Row([
             dbc.Col([crear_logo()], width=3),
@@ -305,104 +309,227 @@ def layout_lingotes():
         html.Button("👤", id="open-login-modal", className="icon-btn", n_clicks=0)
     ], style={"position": "relative"})
 
-    # MODAL UNIFICADO: LOGIN + ACTUALIZAR USUARIO/CONTRASEÑA
+    # ======================
+    # MODAL LOGIN
+    # ======================
     modal = dbc.Modal([
         dbc.ModalHeader("Acceso Administrativo"),
         dbc.ModalBody([
-            # --- LOGIN NORMAL ---
+
+            # --- LOGIN ---
             html.Div(id="login-section", children=[
-                dbc.Input(id="login-username", placeholder="Usuario", type="text", className="mb-2"),
-                dbc.Input(id="login-password", placeholder="Contraseña", type="password", className="mb-3"),
-                html.Div(id="login-message", className="text-danger mb-2 text-center"),
-                dbc.Button("Ingresar", id="login-submit", color="primary", className="w-100 mb-3"),
+                dbc.Input(
+                    id="login-username",
+                    placeholder="Usuario",
+                    type="text",
+                    className="mb-2"
+                ),
+                dbc.Input(
+                    id="login-password",
+                    placeholder="Contraseña",
+                    type="password",
+                    className="mb-3"
+                ),
+                html.Div(
+                    id="login-message",
+                    className="text-danger mb-2 text-center"
+                ),
+                dbc.Button(
+                    "Ingresar",
+                    id="login-submit",
+                    color="primary",
+                    className="w-100 mb-3"
+                ),
                 html.Div([
-                    html.A("🔄 Actualizar usuario o contraseña", id="show-update-form", href="#",
-                           style={"color": "#FFD700", "textDecoration": "none", "fontSize": "0.9em"})
+                    html.A(
+                        "🔄 Actualizar usuario o contraseña",
+                        id="show-update-form",
+                        href="#",
+                        style={
+                            "color": "#FFD700",
+                            "textDecoration": "none",
+                            "fontSize": "0.9em"
+                        }
+                    )
                 ], className="text-center")
             ]),
 
-            # --- VERIFICACIÓN DE CONTRASEÑA ACTUAL ---
-            html.Div(id="verify-section", style={"display": "none"}, children=[
-                html.H6("Verificación de seguridad", className="mb-3"),
-                dbc.Input(id="old-password", placeholder="Contraseña actual", type="password", className="mb-2"),
-                dbc.Button("Verificar", id="verify-password-btn", color="primary", className="w-100 mb-2"),
-                html.Div(id="verify-message", className="text-danger text-center mt-2"),
-                html.A("⬅ Volver al inicio de sesión", id="back-to-login-1", href="#",
-                       style={"color": "#FFD700", "fontSize": "0.9em"})
-            ]),
+            # --- VERIFICAR CONTRASEÑA ACTUAL ---
+            html.Div(
+                id="verify-section",
+                style={"display": "none"},
+                children=[
+                    html.H6("Verificación de seguridad", className="mb-3"),
+                    dbc.Input(
+                        id="old-password",
+                        placeholder="Contraseña actual",
+                        type="password",
+                        className="mb-2"
+                    ),
+                    dbc.Button(
+                        "Verificar",
+                        id="verify-password-btn",
+                        color="primary",
+                        className="w-100 mb-2"
+                    ),
+                    html.Div(
+                        id="verify-message",
+                        className="text-danger text-center mt-2"
+                    ),
+                    html.A(
+                        "⬅ Volver al inicio de sesión",
+                        id="back-to-login-1",
+                        href="#",
+                        style={"color": "#FFD700", "fontSize": "0.9em"}
+                    )
+                ]
+            ),
 
-            # --- ACTUALIZACIÓN DE CREDENCIALES ---
-            html.Div(id="update-section", style={"display": "none"}, children=[
-                html.H6("Actualizar Credenciales", className="mb-3"),
-                dbc.Input(id="new-username", placeholder="Nuevo usuario", type="text", className="mb-2"),
-                dbc.Input(id="new-password", placeholder="Nueva contraseña", type="password", className="mb-2"),
-                dbc.Input(id="confirm-password", placeholder="Confirmar contraseña", type="password", className="mb-3"),
-                dbc.Button("Actualizar", id="update-btn", color="success", className="w-100"),
-                html.Div(id="update-message", className="text-success text-center mt-3"),
-                html.A("⬅ Volver al inicio de sesión", id="back-to-login-2", href="#",
-                       style={"color": "#FFD700", "fontSize": "0.9em"})
-            ])
+            # --- ACTUALIZAR CREDENCIALES ---
+            html.Div(
+                id="update-section",
+                style={"display": "none"},
+                children=[
+                    html.H6("Actualizar Credenciales", className="mb-3"),
+                    dbc.Input(
+                        id="new-username",
+                        placeholder="Nuevo usuario",
+                        type="text",
+                        className="mb-2"
+                    ),
+                    dbc.Input(
+                        id="new-password",
+                        placeholder="Nueva contraseña",
+                        type="password",
+                        className="mb-2"
+                    ),
+                    dbc.Input(
+                        id="confirm-password",
+                        placeholder="Confirmar contraseña",
+                        type="password",
+                        className="mb-3"
+                    ),
+                    dbc.Button(
+                        "Actualizar",
+                        id="update-btn",
+                        color="success",
+                        className="w-100"
+                    ),
+                    html.Div(
+                        id="update-message",
+                        className="text-success text-center mt-3"
+                    ),
+                    html.A(
+                        "⬅ Volver al inicio de sesión",
+                        id="back-to-login-2",
+                        href="#",
+                        style={"color": "#FFD700", "fontSize": "0.9em"}
+                    )
+                ]
+            )
         ]),
         dbc.ModalFooter([
-            dbc.Button("Cerrar", id="login-cancel", color="secondary")
+            dbc.Button(
+                "Cerrar",
+                id="login-cancel",
+                color="secondary"
+            )
         ])
     ], id="modal-login", is_open=False, centered=True)
 
-
+    # ======================
+    # RETURN FINAL
+    # ======================
     return html.Div([
-        dcc.Interval(id='interval-lingotes', interval=30*1000, n_intervals=0),
-        dcc.Store(id='store-porcentajes-lingotes', data=percentages_data),
+
+        # 🔥 OVERLAY DE TRANSICIÓN LOGIN → DASHBOARD
+        html.Div(
+            id="login-overlay",
+            className="login-overlay",
+            children=html.Div(className="login-spinner")
+        ),
+
+        # Estado / timers
+        dcc.Interval(
+            id='interval-lingotes',
+            interval=30 * 1000,
+            n_intervals=0
+        ),
+        dcc.Store(
+            id='store-porcentajes-lingotes',
+            data=percentages_data
+        ),
         html.Div(id="nav-sentinel"),
 
+        # CONTENIDO PRINCIPAL
         html.Div([
             header,
             html.Hr(className="divider"),
 
             dbc.Row([
                 dbc.Col([
-                    html.Div([
-                        html.H1("LINGOTES", className="lingotes-title"),
-                    ], className="text-center")
+                    html.H1(
+                        "LINGOTES",
+                        className="lingotes-title"
+                    )
                 ], width=12)
             ]),
 
             dbc.Row([
-                # PRIMER CARD — VENTA (resaltada)
                 dbc.Col([
                     html.Div([
                         html.H3("VENTA", className="card-title"),
-                        html.Div(id="valor-compra-lingotes", className="card-value"),
-                        html.Div(id="porcentaje-compra-lingotes", className="card-percentage"),
-                    ], id="card-venta", className="lingotes-card lingotes-card-venta")
+                        html.Div(
+                            id="valor-compra-lingotes",
+                            className="card-value"
+                        ),
+                        html.Div(
+                            id="porcentaje-compra-lingotes",
+                            className="card-percentage"
+                        ),
+                    ], id="card-venta",
+                       className="lingotes-card lingotes-card-venta")
                 ], md=4),
 
-                # SEGUNDO CARD — COMPRA (blanca translúcida)
                 dbc.Col([
                     html.Div([
                         html.H3("COMPRA", className="card-title"),
-                        html.Div(id="valor-venta-lingotes", className="card-value"),
-                        html.Div(id="porcentaje-venta-lingotes", className="card-percentage"),
+                        html.Div(
+                            id="valor-venta-lingotes",
+                            className="card-value"
+                        ),
+                        html.Div(
+                            id="porcentaje-venta-lingotes",
+                            className="card-percentage"
+                        ),
                     ], className="lingotes-card lingotes-card-blanca")
                 ], md=4),
 
-                # TERCER CARD — CONTRATACIÓN (blanca translúcida)
                 dbc.Col([
                     html.Div([
                         html.H3("CONTRATACIÓN", className="card-title"),
-                        html.Div(id="valor-venta-directa-lingotes", className="card-value"),
-                        html.Div(id="porcentaje-venta-directa-lingotes", className="card-percentage"),
+                        html.Div(
+                            id="valor-venta-directa-lingotes",
+                            className="card-value"
+                        ),
+                        html.Div(
+                            id="porcentaje-venta-directa-lingotes",
+                            className="card-percentage"
+                        ),
                     ], className="lingotes-card lingotes-card-blanca")
                 ], md=4),
             ], className="mb-4"),
 
-            html.Div([
-                html.P(id="hora-actualizacion-lingotes", className="text-center text-muted mt-4"),
-            ]),
+            html.P(
+                id="hora-actualizacion-lingotes",
+                className="text-center text-muted mt-4"
+            ),
 
             modal
-        ], className="container-wide lingotes-container")
-    ])
 
+        ], className="container-wide lingotes-container")
+
+    ])
 
 # LAYOUT DASHBOARD
 def create_dashboard_layout():
@@ -481,19 +608,11 @@ def create_dashboard_layout():
                             html.Tr([html.Th("CONCEPTO"), html.Th("VALOR")]),
                             html.Tr([
                                 html.Td([
-                                    "TRM (BanRep)",
-                                    html.Button("✏️", id="editar-trm-btn", n_clicks=0,
-                                                style={
-                                                    "marginLeft": "8px",
-                                                    "border": "none",
-                                                    "background": "transparent",
-                                                    "cursor": "pointer",
-                                                    "fontSize": "16px"
-                                                })
+                                    "TRM",
                                 ]),
                                 html.Td(id="trm-anterior")
                             ]),
-                            html.Tr([html.Td("ONZA (INV)"), html.Td(id="oro-anterior")]),
+                            html.Tr([html.Td("ONZA"), html.Td(id="oro-anterior")]),
                             html.Tr([html.Td("PRECIO FULL"), html.Td(id="full-anterior")]),
                         ], className="price-table"),
 
@@ -806,7 +925,6 @@ from werkzeug.security import generate_password_hash
 test_hash = "pbkdf2:sha256:600000$3C4mkOu2RNRVG28Z$a2b7f47a27a7b64e4f67c527bcb5b514183fd9d2e17d556e31da4f48e5678e40"
 print("🧪 Prueba de hash local (contraseña 'admin'):", check_password_hash(test_hash, "admin"))
 
-
 @app.callback(
     [
         Output("modal-login", "is_open"),
@@ -816,7 +934,8 @@ print("🧪 Prueba de hash local (contraseña 'admin'):", check_password_hash(te
         Output("login-message", "children"),
         Output("verify-message", "children"),
         Output("update-message", "children"),
-        Output("nav-sentinel", "children")
+        Output("nav-sentinel", "children"),
+        Output("url", "pathname"),
     ],
     [
         Input("open-login-modal", "n_clicks"),
@@ -826,7 +945,7 @@ print("🧪 Prueba de hash local (contraseña 'admin'):", check_password_hash(te
         Input("verify-password-btn", "n_clicks"),
         Input("update-btn", "n_clicks"),
         Input("back-to-login-1", "n_clicks"),
-        Input("back-to-login-2", "n_clicks")
+        Input("back-to-login-2", "n_clicks"),
     ],
     [
         State("modal-login", "is_open"),
@@ -835,61 +954,72 @@ print("🧪 Prueba de hash local (contraseña 'admin'):", check_password_hash(te
         State("old-password", "value"),
         State("new-username", "value"),
         State("new-password", "value"),
-        State("confirm-password", "value")
-    ]
+        State("confirm-password", "value"),
+        State("url", "pathname"),
+    ],
+    prevent_initial_call=False
 )
 def manejar_modal_login(open_click, cancel_click, login_click, show_update_click,
                         verify_click, update_click, back1, back2,
-                        is_open, username, password, old_pass, new_user, new_pass, confirm_pass):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        return is_open, {"display": "block"}, {"display": "none"}, {"display": "none"}, "", "", "", ""
+                        is_open, username, password, old_pass, new_user, new_pass, confirm_pass,
+                        current_path):
 
-    button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    trigger = dash.callback_context.triggered_id
     usuarios = cargar_usuarios()
 
-    # --- Abrir modal ---
-    if button_id == "open-login-modal":
-        return True, {"display": "block"}, {"display": "none"}, {"display": "none"}, "", "", "", ""
+    SHOW = {"display": "block"}
+    HIDE = {"display": "none"}
+    url_out = dash.no_update
 
-    # --- Cerrar modal ---
-    if button_id == "login-cancel":
-        return False, {"display": "block"}, {"display": "none"}, {"display": "none"}, "", "", "", ""
+    # --- ABRIR MODAL (emoji 👤) ---
+    # Evita que se abra al refrescar (n_clicks pasa de None->0 y dispara el callback)
+    if trigger == "open-login-modal":
+        if open_click and open_click > 0:
+            return True, SHOW, HIDE, HIDE, "", "", "", "", url_out
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
-    # --- LOGIN NORMAL ---
-    if button_id == "login-submit":
+    # --- CERRAR MODAL ---
+    if trigger == "login-cancel":
+        return False, SHOW, HIDE, HIDE, "", "", "", "", url_out
+
+    # --- LOGIN ---
+    if trigger == "login-submit":
         if not username or not password:
-            return True, {"display": "block"}, {"display": "none"}, {"display": "none"}, "⚠️ Ingresa usuario y contraseña", "", "", ""
+            return True, SHOW, HIDE, HIDE, "⚠️ Ingresa usuario y contraseña", "", "", "", url_out
+
         if username not in usuarios:
-            return True, {"display": "block"}, {"display": "none"}, {"display": "none"}, "⚠️ Usuario no registrado", "", "", ""
+            return True, SHOW, HIDE, HIDE, "⚠️ Usuario no registrado", "", "", "", url_out
+
         stored_hash = usuarios[username].get("password", "")
         if check_password_hash(stored_hash, password):
             usuario_autenticado["activo"] = True
             usuario_autenticado["nombre"] = username
-            return False, {"display": "block"}, {"display": "none"}, {"display": "none"}, "", "", "", dcc.Location(pathname="/dashboard", id="redir-login")
+            return False, SHOW, HIDE, HIDE, "", "", "", "", "/dashboard"
         else:
-            return True, {"display": "block"}, {"display": "none"}, {"display": "none"}, "❌ Contraseña incorrecta", "", "", ""
+            return True, SHOW, HIDE, HIDE, "❌ Contraseña incorrecta", "", "", "", url_out
 
-    # --- Mostrar pantalla de verificación ---
-    if button_id == "show-update-form":
-        return True, {"display": "none"}, {"display": "block"}, {"display": "none"}, "", "", "", ""
+    # --- IR A VERIFICACIÓN (para actualizar credenciales) ---
+    if trigger == "show-update-form":
+        return True, HIDE, SHOW, HIDE, "", "", "", "", url_out
 
-    # --- Verificar contraseña actual ---
-    if button_id == "verify-password-btn":
+    # --- VERIFICAR CONTRASEÑA ACTUAL ---
+    if trigger == "verify-password-btn":
         if "admin" not in usuarios:
-            return True, {"display": "none"}, {"display": "block"}, {"display": "none"}, "", "❌ No existe usuario admin", "", ""
+            return True, HIDE, SHOW, HIDE, "", "❌ No existe usuario admin", "", "", url_out
+
         stored_hash = usuarios["admin"]["password"]
         if check_password_hash(stored_hash, old_pass or ""):
-            return True, {"display": "none"}, {"display": "none"}, {"display": "block"}, "", "", "", ""
+            return True, HIDE, HIDE, SHOW, "", "", "", "", url_out
         else:
-            return True, {"display": "none"}, {"display": "block"}, {"display": "none"}, "", "⚠️ Contraseña incorrecta", "", ""
+            return True, HIDE, SHOW, HIDE, "", "⚠️ Contraseña incorrecta", "", "", url_out
 
-    # --- Actualizar credenciales ---
-    if button_id == "update-btn":
+    # --- ACTUALIZAR CREDENCIALES ---
+    if trigger == "update-btn":
         if not new_user or not new_pass or not confirm_pass:
-            return True, {"display": "none"}, {"display": "none"}, {"display": "block"}, "", "", "⚠️ Completa todos los campos", ""
+            return True, HIDE, HIDE, SHOW, "", "", "⚠️ Completa todos los campos", "", url_out
+
         if new_pass != confirm_pass:
-            return True, {"display": "none"}, {"display": "none"}, {"display": "block"}, "", "", "⚠️ Las contraseñas no coinciden", ""
+            return True, HIDE, HIDE, SHOW, "", "", "⚠️ Las contraseñas no coinciden", "", url_out
 
         hashed = generate_password_hash(new_pass)
         usuarios = {
@@ -902,15 +1032,15 @@ def manejar_modal_login(open_click, cancel_click, login_click, show_update_click
         }
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(usuarios, f, indent=2, ensure_ascii=False)
-        return True, {"display": "none"}, {"display": "none"}, {"display": "block"}, "", "", "✅ Credenciales actualizadas. Reinicia e inicia sesión.", ""
 
-    # --- Volver al login ---
-    if button_id in ["back-to-login-1", "back-to-login-2"]:
-        return True, {"display": "block"}, {"display": "none"}, {"display": "none"}, "", "", "", ""
+        return True, HIDE, HIDE, SHOW, "", "", "✅ Credenciales actualizadas. Reinicia e inicia sesión.", "", url_out
 
-    return is_open, {"display": "block"}, {"display": "none"}, {"display": "none"}, "", "", "", ""
+    # --- VOLVER AL LOGIN ---
+    if trigger in ("back-to-login-1", "back-to-login-2"):
+        return True, SHOW, HIDE, HIDE, "", "", "", "", url_out
 
-
+    # --- fallback: no tocar nada ---
+    return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
 # CALLBACKS PRINCIPALES DEL DASHBOARD
 @app.callback(
