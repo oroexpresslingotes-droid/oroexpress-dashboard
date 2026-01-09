@@ -198,9 +198,7 @@ def obtener_precio_oro_kitco():
         return 1950.00
     except Exception as e:
         print(f"❌ Error Kitco: {e}")
-        return 1950.00
-
-def obtener_trm_banrep():
+        redef obtener_trm_banrep():
     """
     TRM día anterior vigente (OFICIAL – datos.gov.co).
     Regla:
