@@ -198,38 +198,33 @@ def obtener_precio_oro_kitco():
         return 1950.00
     except Exception as e:
         print(f"❌ Error Kitco: {e}")
-        redef obtener_trm_banrep():
+        return 1950.00
+
+def obtener_trm_banrep():
     """
-    TRM día anterior vigente (OFICIAL – datos.gov.co).
+    TRM VIGENTE (OFICIAL – datos.gov.co).
     Regla:
-    - Toma la TRM más reciente cuya fecha 'vigenciadesde' sea < hoy.
-    - Maneja automáticamente fines de semana y festivos.
+    - Toma la TRM más reciente por 'vigenciadesde' (DESC).
+    - En fines de semana/festivos, la vigente suele ser la última publicada.
     """
     try:
-        hoy = date.today().isoformat()
-
         url = (
             "https://www.datos.gov.co/resource/32sa-8pi3.json"
-            "?$limit=10&$order=vigenciadesde DESC"
+            "?$limit=1&$order=vigenciadesde DESC"
         )
 
         r = requests.get(url, timeout=10)
         r.raise_for_status()
         data = r.json()
 
-        # Buscar la primera TRM cuya vigencia sea ANTERIOR a hoy
-        for item in data:
-            fecha = item.get("vigenciadesde", "")[:10]
-            if fecha and fecha < hoy:
-                trm = float(item["valor"])
-                print(f"📅 TRM día anterior vigente ({fecha}): {trm}")
-                return trm, fecha
+        if not data:
+            return 3950.0, "Sin datos"
 
-        # Fallback de seguridad
-        ultima = data[0]
-        trm = float(ultima["valor"])
-        fecha = ultima.get("vigenciadesde", "")[:10]
-        print(f"⚠️ Fallback TRM ({fecha}): {trm}")
+        item = data[0]
+        trm = float(item["valor"])
+        fecha = item.get("vigenciadesde", "")[:10]
+
+        print(f"📌 TRM vigente ({fecha}): {trm}")
         return trm, fecha
 
     except Exception as e:
